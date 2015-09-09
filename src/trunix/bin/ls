@@ -1,4 +1,4 @@
 #!/bin/bash
 for filename in *; do
-	echo "$filename"
+	[ -f "$filename" ] && echo "$filename"
 done

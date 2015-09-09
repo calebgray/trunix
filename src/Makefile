@@ -2,14 +2,15 @@ all:
 	-for DIR in */Makefile; do (cd $(CURDIR)/`dirname $$DIR`; $(MAKE)); done
 
 initrd:
-	dd if=/dev/zero of=build/initrd.img bs=1M count=128
-	mkfs.ext2 build/initrd.img
+	dd if=/dev/zero of=initrd.img bs=1M count=128
+	mkfs.ext2 initrd.img
 	mkdir -p initrd
-	mount -o loop build/initrd.img initrd
+	mount -o loop initrd.img initrd
 	cp -r build/* initrd/
 	umount initrd
 	rmdir initrd
-	gzip -f build/initrd.img
+	gzip -f initrd.img
+	mv initrd.img.gz build/
 
 install:
 	cp build/initrd.img.gz /boot/
