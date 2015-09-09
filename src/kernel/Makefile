@@ -14,3 +14,6 @@ build:
 
 install:
 	bash -c "cd linux-4.2 && make install"
+
+clean:
+	rm -fr linux-4.2*
