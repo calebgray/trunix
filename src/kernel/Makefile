@@ -13,4 +13,4 @@ build:
 	bash -c "cd linux-4.2 && make -j6"
 
 install:
-	echo "not yet."
+	bash -c "cd linux-4.2 && make install"
