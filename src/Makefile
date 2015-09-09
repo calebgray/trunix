@@ -1,12 +1,21 @@
-mount:
-	mkdir -p initrd
-	gunzip initrd.img.gz
-	mount -o loop initrd.img initrd
+all:
+	-for DIR in */Makefile; do (cd $(CURDIR)/`dirname $$DIR`; $(MAKE)); done
 
-umount:
+initrd:
+	dd if=/dev/zero of=initrd.img bs=1M count=128
+	mkfs.ext2 initrd.img
+	mkdir -p initrd
+	mount -o loop initrd.img initrd
+	cp -r build/* initrd/
 	umount initrd
-	gzip initrd.img
 	rmdir initrd
+	gzip -f initrd.img
 
 install:
-	cp initrd.img.gz /boot/initrd.img.gz
+	cp initrd.img.gz /boot/
+
+clean:
+	rm -fr build
+
+mrproper:
+	rm -fr inird initrd.img.gz

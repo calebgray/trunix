@@ -1,7 +1,7 @@
 all: fetch extract config build
 
 fetch:
-	wget "https://www.kernel.org/pub/linux/kernel/v4.x/linux-4.2.tar.xz"
+	wget -c "https://www.kernel.org/pub/linux/kernel/v4.x/linux-4.2.tar.xz"
 
 extract:
 	tar xf linux-4.2.tar.xz
