@@ -1,0 +1,2 @@
+# trunix
+Minimalist Linux Distro
