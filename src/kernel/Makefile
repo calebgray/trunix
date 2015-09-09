@@ -7,7 +7,7 @@ extract:
 	tar xf linux-4.2.tar.xz
 
 config:
-	bash -c "cd linux-4.2 && make oldconfig"
+	bash -c "cp .config linux-4.2 && cd linux-4.2 && make oldconfig"
 
 build:
 	bash -c "cd linux-4.2 && make -j6"
