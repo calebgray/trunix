@@ -1,19 +1,21 @@
+VERSION=4.2.1
+
 all: fetch extract config build
 
 fetch:
-	wget -c "https://www.kernel.org/pub/linux/kernel/v4.x/linux-4.2.tar.xz"
+	wget -c "https://www.kernel.org/pub/linux/kernel/v4.x/linux-${VERSION}.tar.xz"
 
 extract:
-	tar xf linux-4.2.tar.xz
+	tar xf linux-${VERSION}.tar.xz
 
 config:
-	bash -c "cp .config linux-4.2 && cd linux-4.2 && make oldconfig"
+	-cp config-linux-${VERSION} linux-${VERSION}/.config && cd linux-${VERSION} && make oldconfig
 
 build:
-	bash -c "cd linux-4.2 && make -j6"
+	-cd linux-${VERSION} && make -j6
 
 install:
-	bash -c "cd linux-4.2 && make install"
+	-cd linux-${VERSION} && make install
 
 clean:
-	rm -fr linux-4.2*
+	rm -fr linux-${VERSION}*
