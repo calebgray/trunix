@@ -1,3 +1,5 @@
+#!/bin/cinit
+
 #include <ncurses.h>
 
 #define HOOK_INIT_INT 0

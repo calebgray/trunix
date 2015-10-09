@@ -1,3 +1,5 @@
+#!/bin/cinit
+
 #include <stdlib.h>
 #include <sys/mount.h>
 
