@@ -1,9 +1,11 @@
 # trunix
-Minimalist Linux Distro
+Minimalist (and Painless) Linux Distro
 
-## Standard Installation
+## Quick Start
 ```
 cd src
 make
-sudo make initrd install
+make initrd
+make
+sudo make install
 ```
