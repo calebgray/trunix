@@ -88,7 +88,7 @@ struct {
 } PORTALS[] = {
   { 0, 1, 1 },
   { 1, 2, 0 },
-  { 1, 2, 0 },
+  { 1, 0, 0 },
   { 2, 1, 0 },
 };
 #define PORTAL_MAX sizeof(PORTALS) / sizeof(PORTALS[0])
@@ -147,6 +147,7 @@ void PortalCollision(int x, int y) {
       level_load(gLevel.portals[portal].level);
       player_x = gLevel.portals[destination].x;
       player_y = gLevel.portals[destination].y;
+      level_draw();
       return;
     }
   }
