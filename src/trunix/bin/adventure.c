@@ -13,14 +13,22 @@ int input;
 int tile_x, tile_y;
 
 struct {
-  int width, height, specialCount;
+  int width, height;
+  int specialCount, portalsCount;
   struct {
     int frame;
     char *frames;
+    void (*collision)();
   } *tiles;
   struct {
     void (*tick)();
   } *specials;
+  struct {
+    //int index;
+    int x, y;
+    int level;
+    int portal;
+  } *portals;
 } gLevel = {
   0, 0, 0, NULL, NULL
 };
@@ -29,6 +37,10 @@ struct {
   unsigned int width;
   unsigned int height;
   char *tiles;
+  struct {
+    int level;
+    int portal;
+  } *portals;
 } LEVELS[] = {
   {
     20, 10,
@@ -39,9 +51,12 @@ struct {
     "|                  |" \
     "|              C   |" \
     "|                  |" \
-    "|           X      ]" \
+    "|                X ]" \
     "|                  |" \
     "+------------------+",
+    {
+      { 1, 0 },
+    },
   },
   {
     10, 10,
@@ -55,6 +70,10 @@ struct {
     "[ X      |" \
     "|        |" \
     "+--------+",
+    {
+      { 0, 0 },
+      { 2, 0 },
+    },
   },
   {
     5, 10,
@@ -68,6 +87,9 @@ struct {
     "| X |" \
     "|   |" \
     "+---+",
+    {
+      { 1, 1 },
+    },
   },
 };
 #define LEVEL_MAX sizeof(LEVELS) / sizeof(LEVELS[0])
@@ -99,7 +121,9 @@ void PlayerControllerTick() {
   // TODO: Add a collision hook to special tiles.
   // NOTE: frame-1 is the last rendered frame... So it's what we want to check.
   int tile = player_x + player_y * gLevel.width;
-  if (gLevel.tiles[tile].frames[gLevel.tiles[tile].frame-1] != ' ') {
+  if (gLevel.tiles[tile].collision != NULL) {
+    gLevel.tiles[tile].collision(player_x, player_y);
+  } else if (gLevel.tiles[tile].frames[gLevel.tiles[tile].frame-1] != ' ') {
     player_x = oldPlayerX;
     player_y = oldPlayerY;
   }
@@ -107,16 +131,48 @@ void PlayerControllerTick() {
   mvaddch(player_y, player_x, 'x');
 }
 
+int level, portal;
+void *PortalInit() {
+  ++gLevel.portalsCount;
+  gLevel.portals = realloc(gLevel.portals, sizeof(gLevel.portals[0]) * gLevel.portalsCount);
+  gLevel.portals[portal].x = tile_x;
+  gLevel.portals[portal].y = tile_y;
+  gLevel.portals[portal].level = LEVELS[level].portals[portal].level;
+  gLevel.portals[portal].portal = LEVELS[level].portals[portal].portal;
+  ++portal;
+  return NULL;
+}
+
+void PortalCollision(int x, int y) {
+  for (portal = 0; portal < gLevel.portalsCount; ++portal) {
+    if (gLevel.portals[portal].x == x && gLevel.portals[portal].y == y) {
+      int destination = gLevel.portals[portal].portal;
+      level_load(gLevel.portals[portal].level);
+      player_x = gLevel.portals[destination].x;
+      player_y = gLevel.portals[destination].y;
+      return;
+    }
+  }
+}
+
 struct {
   char tile;
   void *(*init)();
   void (*tick)();
+  void (*collision)();
 } TILES_SPECIAL[] = {
   {
     'X',
     PlayerControllerInit,
     PlayerControllerTick,
-  }
+    NULL,
+  },
+  {
+    ']',
+    PortalInit,
+    NULL,
+    PortalCollision,
+  },
 };
 #define TILES_SPECIAL_MAX sizeof(TILES_SPECIAL) / sizeof(TILES_SPECIAL[0])
 
@@ -140,35 +196,50 @@ void level_unload() {
     free(gLevel.tiles);
   }
   if (gLevel.specials != NULL) free(gLevel.specials);
+  if (gLevel.portals != NULL) free(gLevel.portals);
 }
 
-void level_load(unsigned int level) {
+void level_load(unsigned int lvl) {
   level_unload();
+
+  level = lvl;
 
   int tile = 0;
   gLevel.width = LEVELS[level].width;
   gLevel.height = LEVELS[level].height;
   gLevel.tiles = malloc(sizeof(gLevel.tiles[0]) * gLevel.width * gLevel.height);
-  gLevel.specials = NULL;
   gLevel.specialCount = 0;
+  gLevel.specials = NULL;
+  
+  portal = 0;
+  gLevel.portalsCount = 0;
+  gLevel.portals = NULL;
+  
   for (tile_y = 0; tile_y < gLevel.height; ++tile_y) {
     for (tile_x = 0; tile_x < gLevel.width; ++tile_x) {
+      gLevel.tiles[tile].frame = 0;
+      gLevel.tiles[tile].frames = NULL;
+      gLevel.tiles[tile].collision = NULL;
+      
       char ch = LEVELS[level].tiles[tile];
       
       for (int i = 0; i < TILES_SPECIAL_MAX; ++i) {
         if (ch == TILES_SPECIAL[i].tile) {
-          ch = (int) TILES_SPECIAL[i].init();
-          if (TILES_SPECIAL[i].tick != 0) {
+          if (TILES_SPECIAL[i].init != NULL) {
+            char init = (int) TILES_SPECIAL[i].init();
+            if (init != NULL) ch = init;
+          }
+          if (TILES_SPECIAL[i].tick != NULL) {
             ++gLevel.specialCount;
             gLevel.specials = realloc(gLevel.specials, sizeof(gLevel.specials[0]) * gLevel.specialCount);
             gLevel.specials[gLevel.specialCount-1].tick = TILES_SPECIAL[i].tick;
           }
+          if (TILES_SPECIAL[i].collision != NULL) {
+            gLevel.tiles[tile].collision = TILES_SPECIAL[i].collision;
+          }
           break;
         }
       }
-      
-      gLevel.tiles[tile].frame = 0;
-      gLevel.tiles[tile].frames = NULL;
       
       for (int i = 0; i < TILES_ANIM_MAX; ++i) {
         if (ch == TILES_ANIM[i].frames[0]) {
