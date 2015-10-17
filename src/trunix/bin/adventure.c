@@ -5,6 +5,8 @@
 #include <sys/time.h>
 #include <ncurses.h>
 
+void level_load(unsigned int lvl);
+
 #define gSpeed 250
 #define gNanoSpeed (gSpeed * 1000)
 
@@ -81,13 +83,13 @@ struct {
 
 struct {
   int from;
-  int to;
+  int level;
   int destination;
 } PORTALS[] = {
-  { 0, 1, 0 },
-  { 1, 0, 0 },
+  { 0, 1, 1 },
   { 1, 2, 0 },
-  { 2, 1, 1 },
+  { 1, 2, 0 },
+  { 2, 1, 0 },
 };
 #define PORTAL_MAX sizeof(PORTALS) / sizeof(PORTALS[0])
 
@@ -118,7 +120,9 @@ void PlayerControllerTick() {
   // TODO: Add a collision hook to special tiles.
   // NOTE: frame-1 is the last rendered frame... So it's what we want to check.
   int tile = player_x + player_y * gLevel.width;
-  if (gLevel.tiles[tile].collision != NULL) {
+  if (player_x == oldPlayerX && player_y == oldPlayerY) {
+    // player didn't move
+  } else if (gLevel.tiles[tile].collision != NULL) {
     gLevel.tiles[tile].collision(player_x, player_y);
   } else if (gLevel.tiles[tile].frames[gLevel.tiles[tile].frame-1] != ' ') {
     player_x = oldPlayerX;
@@ -128,20 +132,16 @@ void PlayerControllerTick() {
   mvaddch(player_y, player_x, 'x');
 }
 
-int level;
+int portal;
 void *PortalInit() {
-  mvprintw(22, 0, "%u", sizeof(gLevel.portals[0]));
-  gLevel.portals = realloc(gLevel.portals, sizeof(gLevel.portals[0]) * (gLevel.portalsCount+1));
-  gLevel.portals[gLevel.portalsCount].x = tile_x;
-  gLevel.portals[gLevel.portalsCount].y = tile_y;
-  gLevel.portals[gLevel.portalsCount].level = PORTALS[level].portal[gLevel.portalsCount].level;
-  gLevel.portals[gLevel.portalsCount].destination = PORTALS[level].portal[gLevel.portalsCount].destination;
-  ++gLevel.portalsCount;
+  gLevel.portals[portal].x = tile_x;
+  gLevel.portals[portal].y = tile_y;
+  ++portal;
   return NULL;
 }
 
 void PortalCollision(int x, int y) {
-  for (int portal = 0; portal < gLevel.portalsCount; ++portal) {
+  for (portal = 0; portal < gLevel.portalsCount; ++portal) {
     if (gLevel.portals[portal].x == x && gLevel.portals[portal].y == y) {
       int destination = gLevel.portals[portal].destination;
       level_load(gLevel.portals[portal].level);
@@ -163,6 +163,12 @@ struct {
     PlayerControllerInit,
     PlayerControllerTick,
     NULL,
+  },
+  {
+    '[',
+    PortalInit,
+    NULL,
+    PortalCollision,
   },
   {
     ']',
@@ -196,10 +202,8 @@ void level_unload() {
   if (gLevel.portals != NULL) free(gLevel.portals);
 }
 
-void level_load(unsigned int lvl) {
+void level_load(unsigned int level) {
   level_unload();
-
-  level = lvl;
 
   int tile = 0;
   gLevel.width = LEVELS[level].width;
@@ -207,8 +211,18 @@ void level_load(unsigned int lvl) {
   gLevel.tiles = malloc(sizeof(gLevel.tiles[0]) * gLevel.width * gLevel.height);
   gLevel.specialCount = 0;
   gLevel.specials = NULL;
+  
   gLevel.portalsCount = 0;
   gLevel.portals = NULL;
+  for (portal = 0; portal < PORTAL_MAX; ++portal) {
+    if (PORTALS[portal].from == level) {
+      gLevel.portals = realloc(gLevel.portals, sizeof(gLevel.portals[0]) * (gLevel.portalsCount+1));
+      gLevel.portals[gLevel.portalsCount].level = PORTALS[portal].level;
+      gLevel.portals[gLevel.portalsCount].destination = PORTALS[portal].destination;
+      ++gLevel.portalsCount;
+    }
+  }
+  portal = 0;
   
   for (tile_y = 0; tile_y < gLevel.height; ++tile_y) {
     for (tile_x = 0; tile_x < gLevel.width; ++tile_x) {
