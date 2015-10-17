@@ -24,10 +24,9 @@ struct {
     void (*tick)();
   } *specials;
   struct {
-    //int index;
     int x, y;
     int level;
-    int portal;
+    int destination;
   } *portals;
 } gLevel = {
   0, 0, 0, NULL, NULL
@@ -37,10 +36,6 @@ struct {
   unsigned int width;
   unsigned int height;
   char *tiles;
-  struct {
-    int level;
-    int portal;
-  } *portals;
 } LEVELS[] = {
   {
     20, 10,
@@ -54,9 +49,6 @@ struct {
     "|                X ]" \
     "|                  |" \
     "+------------------+",
-    {
-      { 1, 0 },
-    },
   },
   {
     10, 10,
@@ -70,10 +62,6 @@ struct {
     "[ X      |" \
     "|        |" \
     "+--------+",
-    {
-      { 0, 0 },
-      { 2, 0 },
-    },
   },
   {
     5, 10,
@@ -87,12 +75,21 @@ struct {
     "| X |" \
     "|   |" \
     "+---+",
-    {
-      { 1, 1 },
-    },
   },
 };
 #define LEVEL_MAX sizeof(LEVELS) / sizeof(LEVELS[0])
+
+struct {
+  int from;
+  int to;
+  int destination;
+} PORTALS[] = {
+  { 0, 1, 0 },
+  { 1, 0, 0 },
+  { 1, 2, 0 },
+  { 2, 1, 1 },
+};
+#define PORTAL_MAX sizeof(PORTALS) / sizeof(PORTALS[0])
 
 int player_x, player_y;
 void *PlayerControllerInit() {
@@ -131,22 +128,22 @@ void PlayerControllerTick() {
   mvaddch(player_y, player_x, 'x');
 }
 
-int level, portal;
+int level;
 void *PortalInit() {
+  mvprintw(22, 0, "%u", sizeof(gLevel.portals[0]));
+  gLevel.portals = realloc(gLevel.portals, sizeof(gLevel.portals[0]) * (gLevel.portalsCount+1));
+  gLevel.portals[gLevel.portalsCount].x = tile_x;
+  gLevel.portals[gLevel.portalsCount].y = tile_y;
+  gLevel.portals[gLevel.portalsCount].level = PORTALS[level].portal[gLevel.portalsCount].level;
+  gLevel.portals[gLevel.portalsCount].destination = PORTALS[level].portal[gLevel.portalsCount].destination;
   ++gLevel.portalsCount;
-  gLevel.portals = realloc(gLevel.portals, sizeof(gLevel.portals[0]) * gLevel.portalsCount);
-  gLevel.portals[portal].x = tile_x;
-  gLevel.portals[portal].y = tile_y;
-  gLevel.portals[portal].level = LEVELS[level].portals[portal].level;
-  gLevel.portals[portal].portal = LEVELS[level].portals[portal].portal;
-  ++portal;
   return NULL;
 }
 
 void PortalCollision(int x, int y) {
-  for (portal = 0; portal < gLevel.portalsCount; ++portal) {
+  for (int portal = 0; portal < gLevel.portalsCount; ++portal) {
     if (gLevel.portals[portal].x == x && gLevel.portals[portal].y == y) {
-      int destination = gLevel.portals[portal].portal;
+      int destination = gLevel.portals[portal].destination;
       level_load(gLevel.portals[portal].level);
       player_x = gLevel.portals[destination].x;
       player_y = gLevel.portals[destination].y;
@@ -210,8 +207,6 @@ void level_load(unsigned int lvl) {
   gLevel.tiles = malloc(sizeof(gLevel.tiles[0]) * gLevel.width * gLevel.height);
   gLevel.specialCount = 0;
   gLevel.specials = NULL;
-  
-  portal = 0;
   gLevel.portalsCount = 0;
   gLevel.portals = NULL;
   
