@@ -6,6 +6,7 @@
 #include <ncurses.h>
 
 void level_load(unsigned int lvl);
+void level_draw();
 
 #define gSpeed 250
 #define gNanoSpeed (gSpeed * 1000)
@@ -40,17 +41,17 @@ struct {
   char *tiles;
 } LEVELS[] = {
   {
-    20, 10,
-    "+------------------+" \
-    "|       B          |" \
-    "|           A      |" \
-    "|                  |" \
-    "|                  |" \
-    "|              C   |" \
-    "|                  |" \
-    "|                X ]" \
-    "|                  |" \
-    "+------------------+",
+    60, 10,
+    "+----------------------------------------------------------+" \
+    "|                                                          |" \
+    "| A                                                        |" \
+    "|                                                          |" \
+    "|                                                          |" \
+    "|                                                          |" \
+    "|                                                          |" \
+    "|                                                        X ]" \
+    "|                                                          |" \
+    "+----------------------------------------------------------+",
   },
   {
     10, 10,
@@ -76,7 +77,20 @@ struct {
     "|   |" \
     "| X |" \
     "|   |" \
-    "+---+",
+    "+-v-+",
+  },
+  {
+    20, 10,
+    "+-------^----------+" \
+    "|                  |" \
+    "|                  |" \
+    "|                  |" \
+    "|                  |" \
+    "|                  |" \
+    "|                  |" \
+    "|                X |" \
+    "|                  |" \
+    "+------------------+",
   },
 };
 #define LEVEL_MAX sizeof(LEVELS) / sizeof(LEVELS[0])
@@ -90,14 +104,16 @@ struct {
   { 1, 2, 0 },
   { 1, 0, 0 },
   { 2, 1, 0 },
+  { 2, 3, 0 },
+  { 3, 2, 1 },
 };
 #define PORTAL_MAX sizeof(PORTALS) / sizeof(PORTALS[0])
 
 int player_x, player_y;
-void *PlayerControllerInit() {
+char PlayerControllerInit() {
   player_x = tile_x;
   player_y = tile_y;
-  return (void *) ' ';
+  return ' ';
 }
 void PlayerControllerTick() {
   int oldPlayerX = player_x, oldPlayerY = player_y;
@@ -133,11 +149,11 @@ void PlayerControllerTick() {
 }
 
 int portal;
-void *PortalInit() {
+char PortalInit() {
   gLevel.portals[portal].x = tile_x;
   gLevel.portals[portal].y = tile_y;
   ++portal;
-  return NULL;
+  return 0;
 }
 
 void PortalCollision(int x, int y) {
@@ -155,7 +171,7 @@ void PortalCollision(int x, int y) {
 
 struct {
   char tile;
-  void *(*init)();
+  char (*init)();
   void (*tick)();
   void (*collision)();
 } TILES_SPECIAL[] = {
@@ -173,6 +189,18 @@ struct {
   },
   {
     ']',
+    PortalInit,
+    NULL,
+    PortalCollision,
+  },
+  {
+    'v',
+    PortalInit,
+    NULL,
+    PortalCollision,
+  },
+  {
+    '^',
     PortalInit,
     NULL,
     PortalCollision,
@@ -236,8 +264,8 @@ void level_load(unsigned int level) {
       for (int i = 0; i < TILES_SPECIAL_MAX; ++i) {
         if (ch == TILES_SPECIAL[i].tile) {
           if (TILES_SPECIAL[i].init != NULL) {
-            char init = (int) TILES_SPECIAL[i].init();
-            if (init != NULL) ch = init;
+            char init = TILES_SPECIAL[i].init();
+            if (init != 0) ch = init;
           }
           if (TILES_SPECIAL[i].tick != NULL) {
             ++gLevel.specialCount;
