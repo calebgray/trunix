@@ -8,47 +8,54 @@
 void level_load(unsigned int lvl);
 void level_draw();
 
-#define gSpeed 250
+#define gSpeed 200
 #define gNanoSpeed (gSpeed * 1000)
 
-int input;
-
-int win_width, win_height;
-int tile_x, tile_y;
+struct {
+  unsigned int width, height;
+  unsigned int input;
+  /*struct timeval lastTime;
+  unsigned int elapsedTime;*/
+} gGame = {
+  100, 100,
+  0,
+};
 
 struct {
-  int width, height;
+  unsigned int width, height;
   struct {
-    int frame;
+    unsigned int frame;
     char *frames;
     void (*collision)();
   } *tiles;
   
-  int specialCount;
+  unsigned int portalsCount;
+  struct {
+    unsigned int x, y;
+    unsigned int level;
+    unsigned int destination;
+  } *portals;
+  
+  unsigned int specialCount;
   struct {
     void (*tick)();
   } *specials;
   
-  int portalsCount;
+  unsigned int enemyCount;
   struct {
-    int x, y;
-    int level;
-    int destination;
-  } *portals;
-  
-  int enemyCount;
-  struct {
-    int frame;
+    unsigned int frame;
     char *frames;
-    int x, y;
+    unsigned int x, y;
   } *enemies;
 } gLevel = {
-  0, 0, NULL, 0, NULL, 0, NULL, 0, NULL
+  0, 0, NULL,
+  0, NULL,
+  0, NULL,
+  0, NULL,
 };
 
 struct {
-  unsigned int width;
-  unsigned int height;
+  unsigned int width, height;
   char *tiles;
 } LEVELS[] = {
   {
@@ -107,9 +114,7 @@ struct {
 #define LEVEL_MAX sizeof(LEVELS) / sizeof(LEVELS[0])
 
 struct {
-  int from;
-  int level;
-  int destination;
+  unsigned int from, level, destination;
 } PORTALS[] = {
   { 0, 1, 1 },
   { 1, 2, 0 },
@@ -120,7 +125,14 @@ struct {
 };
 #define PORTAL_MAX sizeof(PORTALS) / sizeof(PORTALS[0])
 
-int player_x, player_y;
+struct {
+  unsigned int x, y;
+  int health;
+  unsigned int healthMax;
+} gPlayer = {
+  0, 0,
+  0, 4,
+};
 
 enum CollisionType {
   COLLISION_NONE,
@@ -128,11 +140,11 @@ enum CollisionType {
   COLLISION_PLAYER,
   COLLISION_ENEMY,
 };
-enum CollisionType CheckCollision(int x, int y, enum CollisionType ignore) {
-  int tile = x + y * gLevel.width;
+enum CollisionType CheckCollision(unsigned int x, unsigned int y, enum CollisionType ignore) {
+  unsigned int tile = x + y * gLevel.width;
   if (ignore != COLLISION_WALL && gLevel.tiles[tile].frames[gLevel.tiles[tile].frame-1] != ' ') {
     return COLLISION_WALL;
-  } else if (ignore != COLLISION_PLAYER && x == player_x && y == player_y) {
+  } else if (ignore != COLLISION_PLAYER && x == gPlayer.x && y == gPlayer.y) {
     return COLLISION_PLAYER;
   } else {
     // enemies, etc
@@ -140,20 +152,19 @@ enum CollisionType CheckCollision(int x, int y, enum CollisionType ignore) {
   return COLLISION_NONE;
 }
 
-int player_health = 0, player_health_max = 4;
-char PlayerControllerInit() {
-  player_x = tile_x;
-  player_y = tile_y;
-  if (player_health == 0) {
-    player_health = player_health_max;
+char PlayerControllerInit(unsigned int x, unsigned int y) {
+  gPlayer.x = x;
+  gPlayer.y = y;
+  if (gPlayer.health <= 0) {
+    gPlayer.health = gPlayer.healthMax;
   }
   return ' ';
 }
 void PlayerControllerTick() {
-  int healthbar_size = 2 + player_health_max;
-  mvaddch(1, win_width - healthbar_size - 1, '[');
-  for (int health = 1; health < player_health_max + 1; ++health) {
-    if (health <= player_health) {
+  unsigned int healthbar_size = 2 + gPlayer.healthMax;
+  mvaddch(1, gGame.width - healthbar_size - 1, '[');
+  for (unsigned int health = 1; health < gPlayer.healthMax + 1; ++health) {
+    if (health <= gPlayer.health) {
       addch('=');
     } else {
       addch(' ');
@@ -161,51 +172,51 @@ void PlayerControllerTick() {
   }
   addch(']');
   
-  int oldPlayerX = player_x, oldPlayerY = player_y;
+  unsigned int oldPlayerX = gPlayer.x, oldPlayerY = gPlayer.y;
   
-  switch(input) {
+  switch(gGame.input) {
   case KEY_LEFT:
-    --player_x;
+    --gPlayer.x;
     break;
   case KEY_RIGHT:
-    ++player_x;
+    ++gPlayer.x;
     break;
   case KEY_UP:
-    --player_y;
+    --gPlayer.y;
     break;
   case KEY_DOWN:
-    ++player_y;
+    ++gPlayer.y;
     break;
   }
   
   // TODO: Add a collision hook to special tiles.
   // NOTE: frame-1 is the last rendered frame... So it's what we want to check.
-  int tile = player_x + player_y * gLevel.width;
-  if (player_x == oldPlayerX && player_y == oldPlayerY) {
+  int tile = gPlayer.x + gPlayer.y * gLevel.width;
+  if (gPlayer.x == oldPlayerX && gPlayer.y == oldPlayerY) {
     // player didn't move
   } else if (gLevel.tiles[tile].collision != NULL) {
-    gLevel.tiles[tile].collision(player_x, player_y);
-  } else if (CheckCollision(player_x, player_y, COLLISION_PLAYER) != COLLISION_NONE) {
-    player_x = oldPlayerX;
-    player_y = oldPlayerY;
+    gLevel.tiles[tile].collision(gPlayer.x, gPlayer.y);
+  } else if (CheckCollision(gPlayer.x, gPlayer.y, COLLISION_PLAYER) != COLLISION_NONE) {
+    gPlayer.x = oldPlayerX;
+    gPlayer.y = oldPlayerY;
   }
 
-  mvaddch(player_y, player_x, 'x');
+  mvaddch(gPlayer.y, gPlayer.x, 'x');
 }
 void PlayerHealth(int delta) {
-  player_health += delta;
-  if (player_health <= 0) {
+  gPlayer.health += delta;
+  if (gPlayer.health <= 0) {
     // reset_game();
     level_load(0);
   }
 }
 
-int enemy = 0;
-int EnemyInit() {
+unsigned int enemy = 0;
+unsigned int EnemyInit(unsigned int x, unsigned int y) {
   enemy = gLevel.enemyCount++;
   gLevel.enemies = realloc(gLevel.enemies, sizeof(gLevel.enemies[0]) * gLevel.enemyCount);
-  gLevel.enemies[enemy].x = tile_x;
-  gLevel.enemies[enemy].y = tile_y;
+  gLevel.enemies[enemy].x = x;
+  gLevel.enemies[enemy].y = y;
   return enemy;
 }
 
@@ -217,8 +228,8 @@ void EnemyTick() {
   if (++enemy == gLevel.enemyCount) enemy = 0;
 }
 
-char EnemyChaserInit() {
-  enemy = EnemyInit();
+char EnemyChaserInit(unsigned int x, unsigned int y) {
+  enemy = EnemyInit(x, y);
   gLevel.enemies[enemy].frame = 0;
   gLevel.enemies[enemy].frames = "Aa";
   return ' ';
@@ -226,14 +237,14 @@ char EnemyChaserInit() {
 
 void EnemyChaserTick() {
   // dumb chase
-  int oldX = gLevel.enemies[enemy].x, oldY = gLevel.enemies[enemy].y;
-  if (gLevel.enemies[enemy].x < player_x) {
+  unsigned int oldX = gLevel.enemies[enemy].x, oldY = gLevel.enemies[enemy].y;
+  if (gLevel.enemies[enemy].x < gPlayer.x) {
     ++gLevel.enemies[enemy].x;
-  } else if (gLevel.enemies[enemy].x > player_x) {
+  } else if (gLevel.enemies[enemy].x > gPlayer.x) {
     --gLevel.enemies[enemy].x;
-  } else if (gLevel.enemies[enemy].y < player_y) {
+  } else if (gLevel.enemies[enemy].y < gPlayer.y) {
     ++gLevel.enemies[enemy].y;
-  } else if (gLevel.enemies[enemy].y > player_y) {
+  } else if (gLevel.enemies[enemy].y > gPlayer.y) {
     --gLevel.enemies[enemy].y;
   }
   
@@ -249,25 +260,27 @@ void EnemyChaserTick() {
   EnemyTick();
 }
 
-void EnemyChaserCollision(int x, int y) {
+void EnemyChaserCollision(unsigned int x, unsigned int y) {
   //
 }
 
-int portal;
-char PortalInit() {
-  gLevel.portals[portal].x = tile_x;
-  gLevel.portals[portal].y = tile_y;
+unsigned int portal;
+char PortalInit(unsigned int x, unsigned int y) {
+  gLevel.portals[portal].x = x;
+  gLevel.portals[portal].y = y;
   ++portal;
   return 0;
 }
 
-void PortalCollision(int x, int y) {
+void PortalCollision(unsigned int x, unsigned int y) {
   for (portal = 0; portal < gLevel.portalsCount; ++portal) {
     if (gLevel.portals[portal].x == x && gLevel.portals[portal].y == y) {
-      int destination = gLevel.portals[portal].destination;
+      unsigned int destination = gLevel.portals[portal].destination;
       level_load(gLevel.portals[portal].level);
-      player_x = gLevel.portals[destination].x;
-      player_y = gLevel.portals[destination].y;
+      gPlayer.x = gLevel.portals[destination].x;
+      gPlayer.y = gLevel.portals[destination].y;
+      // TODO: Without setting (input = 0), input gets processed twice.
+      //       I kind of like that, but it may need to be changed later.
       level_draw();
       return;
     }
@@ -276,7 +289,7 @@ void PortalCollision(int x, int y) {
 
 struct {
   char tile;
-  char (*init)();
+  char (*init)(unsigned int x, unsigned int y);
   void (*tick)();
   void (*collision)();
 } TILES_SPECIAL[] = {
@@ -329,9 +342,9 @@ struct {
 
 void level_unload(bool full) {
   if (gLevel.tiles != NULL) {
-    int tile = 0;
-    for (tile_y = 0; tile_y < gLevel.height; ++tile_y) {
-      for (tile_x = 0; tile_x < gLevel.width; ++tile_x) {
+    unsigned int tile = 0;
+    for (unsigned int tile_y = 0; tile_y < gLevel.height; ++tile_y) {
+      for (unsigned int tile_x = 0; tile_x < gLevel.width; ++tile_x) {
         free(gLevel.tiles[tile].frames);
         ++tile;
       }
@@ -340,6 +353,7 @@ void level_unload(bool full) {
   if (full) {
     free(gLevel.tiles);
     free(gLevel.portals);
+    free(gLevel.specials);
     free(gLevel.enemies);
   }
 }
@@ -347,7 +361,6 @@ void level_unload(bool full) {
 void level_load(unsigned int level) {
   level_unload(false);
 
-  int tile = 0;
   gLevel.width = LEVELS[level].width;
   gLevel.height = LEVELS[level].height;
   gLevel.tiles = realloc(gLevel.tiles, sizeof(gLevel.tiles[0]) * gLevel.width * gLevel.height);
@@ -367,18 +380,19 @@ void level_load(unsigned int level) {
   gLevel.enemyCount = 0;
   enemy = 0;
   
-  for (tile_y = 0; tile_y < gLevel.height; ++tile_y) {
-    for (tile_x = 0; tile_x < gLevel.width; ++tile_x) {
+  unsigned int tile = 0;
+  for (unsigned int tile_y = 0; tile_y < gLevel.height; ++tile_y) {
+    for (unsigned int tile_x = 0; tile_x < gLevel.width; ++tile_x) {
       gLevel.tiles[tile].frame = 0;
       gLevel.tiles[tile].frames = NULL;
       gLevel.tiles[tile].collision = NULL;
       
       char ch = LEVELS[level].tiles[tile];
       
-      for (int i = 0; i < TILES_SPECIAL_MAX; ++i) {
+      for (unsigned int i = 0; i < TILES_SPECIAL_MAX; ++i) {
         if (ch == TILES_SPECIAL[i].tile) {
           if (TILES_SPECIAL[i].init != NULL) {
-            char init = TILES_SPECIAL[i].init();
+            char init = TILES_SPECIAL[i].init(tile_x, tile_y);
             if (init != 0) ch = init;
           }
           if (TILES_SPECIAL[i].tick != NULL) {
@@ -393,7 +407,7 @@ void level_load(unsigned int level) {
         }
       }
       
-      for (int i = 0; i < TILES_ANIM_MAX; ++i) {
+      for (unsigned int i = 0; i < TILES_ANIM_MAX; ++i) {
         if (ch == TILES_ANIM[i].frames[0]) {
           gLevel.tiles[tile].frames = malloc(sizeof(char) * (strlen(TILES_ANIM[i].frames) + 1));
           strcpy(gLevel.tiles[tile].frames, TILES_ANIM[i].frames);
@@ -413,11 +427,11 @@ void level_load(unsigned int level) {
 }
 
 void level_draw() {
-  int tile = 0;
+  unsigned int tile = 0;
   
   move(0, 0);
-  for (tile_y = 0; tile_y < gLevel.height; ++tile_y) {
-    for (tile_x = 0; tile_x < gLevel.width; ++tile_x) {
+  for (unsigned int tile_y = 0; tile_y < gLevel.height; ++tile_y) {
+    for (unsigned int tile_x = 0; tile_x < gLevel.width; ++tile_x) {
       if (gLevel.tiles[tile].frames[gLevel.tiles[tile].frame] == 0) {
         gLevel.tiles[tile].frame = 0;
       }
@@ -435,12 +449,13 @@ void level_draw() {
     gLevel.specials[tile].tick();
   }
   
+  //mvprintw(gGame.height - 2, 1, "%u", gGame.elapsedTime);
+
   refresh();
 }
 
 int main() {
-  struct timeval start;
-  struct timeval end;
+  //struct timeval lastTime;
 
   WINDOW *win = initscr();
   keypad(win, true);
@@ -452,17 +467,16 @@ int main() {
   start_color();
   //
   
-  win_width = getmaxx(win);
-  win_height = getmaxy(win);
+  gGame.width = getmaxx(win);
+  gGame.height = getmaxy(win);
   
   level_load(0);
-  while (input != 'q') {
-    gettimeofday(&start, NULL);
-    input = getch();
-    gettimeofday(&end, NULL);
-    unsigned int diff = 1000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec);
+  //gettimeofday(&gGame.lastTime, NULL);
+  while ((gGame.input = getch()) != 'q') {
     level_draw();
-    //if (diff < gNanoSpeed) usleep(gNanoSpeed - diff);
+    /*gettimeofday(&lastTime, NULL);
+    gGame.elapsedTime = 1000 * (gGame.lastTime.tv_sec - lastTime.tv_sec) + (gGame.lastTime.tv_usec - lastTime.tv_usec);
+    gGame.lastTime = lastTime;*/
   }
   level_unload(true);
   
@@ -470,7 +484,8 @@ int main() {
   curs_set(1);
   echo();
   noraw();
+  delwin(win);
   endwin();
-  
+
   return 0;
 }
