@@ -1,3 +1,8 @@
+include ./make.config
+
+test:
+	-cd bash && $(MAKE)
+
 all:
 	-for DIR in */Makefile; do (cd $(CURDIR)/`dirname $$DIR`; $(MAKE)); done
 

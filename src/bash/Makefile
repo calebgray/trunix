@@ -1,16 +1,30 @@
-all: fetch extract build install
+include ../make.config
 
-fetch:
-	wget -c "http://ftp.gnu.org/gnu/bash/bash-4.2.53.tar.gz"
+VERSION=4.4-rc2
 
-extract:
-	tar xzf bash-4.2.53.tar.gz
+test:
+	echo $(BUILD_DIR)
 
-build:
-	bash -c "cd bash-4.2.53 && ./configure --enable-static-link --without-bash-malloc --prefix=$(shell realpath $(CURDIR)/../build) && make -j6"
+all: fetch extract config build install
 
-install:
-	bash -c "cd bash-4.2.53 && make install"
+bash-$(VERSION).tar.gz:
+	-wget -c "http://ftp.gnu.org/gnu/bash/bash-$(VERSION).tar.gz"
 
+bash-$(VERSION): bash-$(VERSION).tar.gz
+	-tar xzf bash-$(VERSION).tar.gz
+
+bash-$(VERSION)/bash: bash-$(VERSION)
+	-cd bash-$(VERSION) && ./configure --enable-static-link --without-bash-malloc --prefix=$(BUILD_DIR) && make -j8
+
+$(BUILD_DIR)/bin/bash: bash-$(VERSION)/bash
+	-cd bash-$(VERSION) && make install
+
+fetch: bash-$(VERSION).tar.gz
+extract: bash-$(VERSION)
+config:
+build: bash-$(VERSION)/bash
+install: $(BUILD_DIR)/bin/bash
 clean:
-	rm -fr bash-4.2.53*
+	rm -fr bash-$(VERSION)*
+
+.PHONY: all fetch extract build install clean

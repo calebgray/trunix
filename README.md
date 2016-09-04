@@ -9,3 +9,12 @@ make initrd
 make
 sudo make install
 ```
+
+## Dependencies
+```
+autotools
+wget
+tar
+gzip
+gcc or clang
+```
